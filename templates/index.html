@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebSecAudit — Security Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --surface2: #161b22;
+    --border: #21262d;
+    --accent: #00d4ff;
+    --accent2: #00ff88;
+    --danger: #ff4757;
+    --warn: #ffa502;
+    --unknown: #747d8c;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --pass: #00ff88;
+    --fail: #ff4757;
+    --partial: #ffa502;
+    --glow: 0 0 20px rgba(0, 212, 255, 0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: 0 0 24px rgba(0,212,255,0.3);
+    flex-shrink: 0;
+  }
+
+  .logo-text h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  .badge {
+    margin-left: auto;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.3);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'Share Tech Mono', monospace;
+    letter-spacing: 1px;
+  }
+
+  /* Scan Box */
+  .scan-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 32px;
+    box-shadow: var(--glow);
+  }
+
+  .scan-box h2 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .url-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .url-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+  }
+
+  .url-input::placeholder { color: var(--text-muted); }
+
+  .scan-btn {
+    background: linear-gradient(135deg, var(--accent), #0099cc);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 28px;
+    color: #000;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .scan-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,212,255,0.4); }
+  .scan-btn:active { transform: translateY(0); }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Status bar */
+  .status-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent);
+  }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(0,212,255,0.2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Summary cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+
+  .summary-card.pass { border-color: rgba(0,255,136,0.3); }
+  .summary-card.fail { border-color: rgba(255,71,87,0.3); }
+  .summary-card.partial { border-color: rgba(255,165,2,0.3); }
+  .summary-card.unknown { border-color: rgba(116,125,140,0.3); }
+
+  .summary-num {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .summary-card.pass .summary-num { color: var(--pass); }
+  .summary-card.fail .summary-num { color: var(--fail); }
+  .summary-card.partial .summary-num { color: var(--partial); }
+  .summary-card.unknown .summary-num { color: var(--unknown); }
+
+  .summary-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Score ring */
+  .score-section {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+  }
+
+  .score-ring-wrap { position: relative; flex-shrink: 0; }
+
+  .score-ring {
+    width: 100px; height: 100px;
+    transform: rotate(-90deg);
+  }
+
+  .score-ring circle {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+  }
+
+  .ring-bg { stroke: var(--surface2); }
+  .ring-fg { stroke: var(--accent); stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset 1s ease; }
+
+  .score-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .score-num span { font-size: 11px; color: var(--text-muted); font-family: 'Exo 2', sans-serif; }
+
+  .score-info h3 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .score-info p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Results */
+  .results-section { display: none; }
+
+  .section-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* Category group */
+  .category-group { margin-bottom: 24px; }
+
+  .category-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Share Tech Mono', monospace;
+    margin-bottom: 8px;
+    padding-left: 4px;
+  }
+
+  .result-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .result-item:hover { border-color: rgba(0,212,255,0.2); }
+
+  .status-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+
+  .status-dot.pass { background: var(--pass); box-shadow: 0 0 6px var(--pass); }
+  .status-dot.fail { background: var(--fail); box-shadow: 0 0 6px var(--fail); }
+  .status-dot.partial { background: var(--partial); box-shadow: 0 0 6px var(--partial); }
+  .status-dot.unknown { background: var(--unknown); }
+
+  .result-content { flex: 1; }
+
+  .result-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+
+  .result-detail {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  .status-badge {
+    font-size: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .status-badge.pass { background: rgba(0,255,136,0.1); color: var(--pass); border: 1px solid rgba(0,255,136,0.3); }
+  .status-badge.fail { background: rgba(255,71,87,0.1); color: var(--fail); border: 1px solid rgba(255,71,87,0.3); }
+  .status-badge.partial { background: rgba(255,165,2,0.1); color: var(--partial); border: 1px solid rgba(255,165,2,0.3); }
+  .status-badge.unknown { background: rgba(116,125,140,0.1); color: var(--unknown); border: 1px solid rgba(116,125,140,0.3); }
+
+  /* Manual override toggle */
+  .manual-controls {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .toggle-btn {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid;
+    cursor: pointer;
+    font-family: 'Share Tech Mono', monospace;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+    background: transparent;
+  }
+
+  .toggle-btn.pass-btn { border-color: rgba(0,255,136,0.4); color: var(--pass); }
+  .toggle-btn.pass-btn:hover, .toggle-btn.pass-btn.active { background: rgba(0,255,136,0.15); }
+  .toggle-btn.fail-btn { border-color: rgba(255,71,87,0.4); color: var(--fail); }
+  .toggle-btn.fail-btn:hover, .toggle-btn.fail-btn.active { background: rgba(255,71,87,0.15); }
+  .toggle-btn.na-btn { border-color: rgba(116,125,140,0.4); color: var(--unknown); }
+  .toggle-btn.na-btn:hover, .toggle-btn.na-btn.active { background: rgba(116,125,140,0.15); }
+
+  /* Note input */
+  .note-row {
+    display: none;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .note-row.open { display: flex; gap: 8px; }
+
+  .note-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    outline: none;
+  }
+
+  .note-input:focus { border-color: rgba(0,212,255,0.4); }
+
+  /* Export */
+  .export-bar {
+    display: none;
+    gap: 12px;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  .export-btn {
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+  }
+
+  .export-pdf {
+    background: linear-gradient(135deg, #ff4757, #cc0020);
+    color: #fff;
+  }
+
+  .export-pdf:hover { box-shadow: 0 4px 16px rgba(255,71,87,0.4); transform: translateY(-1px); }
+
+  .new-scan-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .new-scan-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .scan-meta {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: auto;
+    align-self: center;
+  }
+
+  /* Error */
+  .error-box {
+    display: none;
+    background: rgba(255,71,87,0.08);
+    border: 1px solid rgba(255,71,87,0.3);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-top: 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--fail);
+  }
+
+  /* Print/PDF styles */
+  @media print {
+    body::before { display: none; }
+    .scan-box, .export-bar, header .badge { display: none !important; }
+    .results-section, .summary-grid, .score-section, .export-bar { display: block !important; }
+    body { background: #fff; color: #000; }
+    .result-item { border: 1px solid #ddd; break-inside: avoid; }
+    .logo-text h1 { -webkit-text-fill-color: #000; color: #000; }
+  }
+
+  @media (max-width: 600px) {
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+    .input-row { flex-direction: column; }
+    .score-section { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div class="logo-icon">🔐</div>
+      <div class="logo-text">
+        <h1>WEBSECAUDIT</h1>
+        <p>SECURITY ASSESSMENT PLATFORM</p>
+      </div>
+      <div class="badge">v1.0 — QNAYDS ACADEMY</div>
+    </div>
+  </header>
+
+  <!-- Scan Input -->
+  <div class="scan-box">
+    <h2>Target URL</h2>
+    <div class="input-row">
+      <input type="text" class="url-input" id="urlInput" placeholder="https://example.com" autocomplete="off" spellcheck="false">
+      <button class="scan-btn" id="scanBtn" onclick="startScan()">▶ SCAN</button>
+    </div>
+    <div class="status-bar" id="statusBar">
+      <div class="spinner"></div>
+      <span id="statusText">Initializing scan...</span>
+    </div>
+    <div class="error-box" id="errorBox"></div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid" id="summaryGrid" style="display:none">
+    <div class="summary-card pass">
+      <div class="summary-num" id="cnt-pass">0</div>
+      <div class="summary-label">✅ Pass</div>
+    </div>
+    <div class="summary-card fail">
+      <div class="summary-num" id="cnt-fail">0</div>
+      <div class="summary-label">❌ Fail</div>
+    </div>
+    <div class="summary-card partial">
+      <div class="summary-num" id="cnt-partial">0</div>
+      <div class="summary-label">⚠ Partial</div>
+    </div>
+    <div class="summary-card unknown">
+      <div class="summary-num" id="cnt-unknown">0</div>
+      <div class="summary-label">— Unknown</div>
+    </div>
+  </div>
+
+  <!-- Score -->
+  <div class="score-section" id="scoreSection" style="display:none">
+    <div class="score-ring-wrap">
+      <svg class="score-ring" viewBox="0 0 100 100">
+        <circle class="ring-bg" cx="50" cy="50" r="45"/>
+        <circle class="ring-fg" id="ringFg" cx="50" cy="50" r="45"/>
+      </svg>
+      <div class="score-num" id="scoreNum">0%<span>SCORE</span></div>
+    </div>
+    <div class="score-info">
+      <h3 id="scoreLabel">Calculating...</h3>
+      <p id="scoreDesc">Auto-detected checks complete. Review manual items below to improve accuracy.</p>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-section" id="resultsSection">
+    <div class="section-title">Auto-Detected Results</div>
+    <div id="autoResults"></div>
+
+    <div class="section-title" style="margin-top:32px">Manual Verification Required</div>
+    <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;font-family:'Share Tech Mono',monospace;">
+      These checks cannot be detected externally. Mark each item based on your knowledge of the target system.
+    </p>
+    <div id="manualResults"></div>
+
+    <div class="export-bar" id="exportBar">
+      <button class="export-btn export-pdf" onclick="exportPDF()">⬇ Export PDF Report</button>
+      <button class="export-btn new-scan-btn" onclick="newScan()">↺ New Scan</button>
+      <span class="scan-meta" id="scanMeta"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+let scanData = null;
+
+function startScan() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { showError('Please enter a target URL.'); return; }
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('statusBar').style.display = 'flex';
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('summaryGrid').style.display = 'none';
+  document.getElementById('scoreSection').style.display = 'none';
+  document.getElementById('resultsSection').style.display = 'none';
+
+  const steps = ['Resolving target...', 'Fetching HTTP response...', 'Analyzing headers...', 'Checking cookies...', 'Evaluating CORS & HTTPS...', 'Compiling results...'];
+  let si = 0;
+  const interval = setInterval(() => {
+    if (si < steps.length) document.getElementById('statusText').textContent = steps[si++];
+  }, 600);
+
+  fetch('/scan', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url })
+  })
+  .then(r => r.json())
+  .then(data => {
+    clearInterval(interval);
+    document.getElementById('statusBar').style.display = 'none';
+    document.getElementById('scanBtn').disabled = false;
+    if (data.error) { showError(data.error); return; }
+    scanData = data;
+    renderResults(data);
+  })
+  .catch(err => {
+    clearInterval(interval);
+    document.getElementById('statusBar').style.display = 'none';
+    document.getElementById('scanBtn').disabled = false;
+    showError('Network error: ' + err.message);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function renderResults(data) {
+  // Auto results grouped by category
+  const autoGroups = {};
+  data.auto_results.forEach(item => {
+    if (!autoGroups[item.category]) autoGroups[item.category] = [];
+    autoGroups[item.category].push(item);
+  });
+
+  let autoHTML = '';
+  for (const [cat, items] of Object.entries(autoGroups)) {
+    autoHTML += `<div class="category-group"><div class="category-label">${cat}</div>`;
+    items.forEach(item => {
+      autoHTML += renderAutoItem(item);
+    });
+    autoHTML += '</div>';
+  }
+  document.getElementById('autoResults').innerHTML = autoHTML;
+
+  // Manual results grouped by category
+  const manGroups = {};
+  data.manual_items.forEach(item => {
+    if (!manGroups[item.category]) manGroups[item.category] = [];
+    manGroups[item.category].push(item);
+  });
+
+  let manHTML = '';
+  for (const [cat, items] of Object.entries(manGroups)) {
+    manHTML += `<div class="category-group"><div class="category-label">${cat}</div>`;
+    items.forEach(item => {
+      manHTML += renderManualItem(item);
+    });
+    manHTML += '</div>';
+  }
+  document.getElementById('manualResults').innerHTML = manHTML;
+
+  // Show sections
+  document.getElementById('summaryGrid').style.display = 'grid';
+  document.getElementById('scoreSection').style.display = 'flex';
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('exportBar').style.display = 'flex';
+  document.getElementById('scanMeta').textContent = `Scanned: ${data.scanned_at} | HTTP ${data.status_code}`;
+
+  updateSummary();
+}
+
+function renderAutoItem(item) {
+  return `<div class="result-item" id="item-${item.id}">
+    <div class="status-dot ${item.status}"></div>
+    <div class="result-content">
+      <div class="result-name">${item.name}</div>
+      <div class="result-detail">${item.detail}</div>
+    </div>
+    <div class="status-badge ${item.status}">${item.status.toUpperCase()}</div>
+  </div>`;
+}
+
+function renderManualItem(item) {
+  return `<div class="result-item" id="item-${item.id}">
+    <div class="status-dot ${item.status}" id="dot-${item.id}"></div>
+    <div class="result-content">
+      <div class="result-name">${item.name}</div>
+      <div class="result-detail" id="detail-${item.id}">${item.detail}</div>
+      <div class="note-row" id="note-row-${item.id}">
+        <input type="text" class="note-input" id="note-${item.id}" placeholder="Add note..." onchange="saveNote('${item.id}')">
+      </div>
+    </div>
+    <div class="manual-controls">
+      <button class="toggle-btn pass-btn" id="pass-${item.id}" onclick="setManual('${item.id}','pass')">PASS</button>
+      <button class="toggle-btn fail-btn" id="fail-${item.id}" onclick="setManual('${item.id}','fail')">FAIL</button>
+      <button class="toggle-btn na-btn" id="na-${item.id}" onclick="setManual('${item.id}','unknown')">N/A</button>
+    </div>
+  </div>`;
+}
+
+function setManual(id, status) {
+  const item = scanData.manual_items.find(i => i.id === id);
+  if (!item) return;
+  item.status = status;
+
+  // Update dot
+  const dot = document.getElementById('dot-' + id);
+  dot.className = 'status-dot ' + status;
+
+  // Update active button
+  ['pass','fail','na'].forEach(s => {
+    const btn = document.getElementById(s + '-' + id);
+    if (btn) btn.classList.remove('active');
+  });
+  const activeKey = status === 'unknown' ? 'na' : status;
+  const activeBtn = document.getElementById(activeKey + '-' + id);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Show note row
+  const noteRow = document.getElementById('note-row-' + id);
+  noteRow.classList.add('open');
+
+  updateSummary();
+}
+
+function saveNote(id) {
+  const item = scanData.manual_items.find(i => i.id === id);
+  if (!item) return;
+  const note = document.getElementById('note-' + id).value;
+  item.note = note;
+  if (note) {
+    document.getElementById('detail-' + id).textContent = 'Note: ' + note;
+  }
+}
+
+function updateSummary() {
+  const all = [...scanData.auto_results, ...scanData.manual_items];
+  const counts = { pass: 0, fail: 0, partial: 0, unknown: 0 };
+  all.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
+
+  document.getElementById('cnt-pass').textContent = counts.pass;
+  document.getElementById('cnt-fail').textContent = counts.fail;
+  document.getElementById('cnt-partial').textContent = counts.partial || 0;
+  document.getElementById('cnt-unknown').textContent = counts.unknown;
+
+  const scored = all.filter(i => i.status !== 'unknown');
+  const score = scored.length > 0 ? Math.round((counts.pass / scored.length) * 100) : 0;
+
+  document.getElementById('scoreNum').innerHTML = `${score}%<span>SCORE</span>`;
+
+  // Ring animation
+  const circumference = 283;
+  const offset = circumference - (score / 100) * circumference;
+  document.getElementById('ringFg').style.strokeDashoffset = offset;
+
+  // Color ring
+  const ring = document.getElementById('ringFg');
+  if (score >= 75) ring.style.stroke = 'var(--pass)';
+  else if (score >= 50) ring.style.stroke = 'var(--partial)';
+  else ring.style.stroke = 'var(--fail)';
+
+  const label = score >= 75 ? 'Good Security Posture' : score >= 50 ? 'Moderate Risk — Improvements Needed' : 'High Risk — Critical Issues Found';
+  document.getElementById('scoreLabel').textContent = label;
+}
+
+function newScan() {
+  document.getElementById('urlInput').value = '';
+  document.getElementById('summaryGrid').style.display = 'none';
+  document.getElementById('scoreSection').style.display = 'none';
+  document.getElementById('resultsSection').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+  scanData = null;
+}
+
+function exportPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const url = scanData.url;
+  const date = scanData.scanned_at;
+  const all = [...scanData.auto_results, ...scanData.manual_items];
+  const counts = { pass: 0, fail: 0, partial: 0, unknown: 0 };
+  all.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
+  const scored = all.filter(i => i.status !== 'unknown');
+  const score = scored.length > 0 ? Math.round((counts.pass / scored.length) * 100) : 0;
+
+  let y = 18;
+  const lm = 15, rm = 195;
+
+  // Header
+  doc.setFillColor(8, 12, 16);
+  doc.rect(0, 0, 210, 40, 'F');
+  doc.setTextColor(0, 212, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(20);
+  doc.text('WEBSECAUDIT', lm, y + 6);
+  doc.setFontSize(9);
+  doc.setTextColor(139, 148, 158);
+  doc.text('Security Assessment Report — Qnayds Academy', lm, y + 13);
+  doc.setTextColor(0, 212, 255);
+  doc.setFontSize(8);
+  doc.text(`Score: ${score}%`, rm - 20, y + 6, { align: 'right' });
+
+  y = 50;
+  doc.setTextColor(50, 50, 50);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Target: ${url}`, lm, y);
+  doc.text(`Scanned: ${date}  |  HTTP ${scanData.status_code}`, lm, y + 5);
+
+  y += 14;
+
+  // Summary boxes
+  const boxW = 40, boxH = 16;
+  const statuses = [
+    { label: 'PASS', count: counts.pass, r: 0, g: 180, b: 100 },
+    { label: 'FAIL', count: counts.fail, r: 220, g: 50, b: 70 },
+    { label: 'PARTIAL', count: counts.partial || 0, r: 220, g: 140, b: 20 },
+    { label: 'UNKNOWN', count: counts.unknown, r: 100, g: 110, b: 120 },
+  ];
+
+  statuses.forEach((s, i) => {
+    const bx = lm + i * (boxW + 3);
+    doc.setFillColor(s.r, s.g, s.b);
+    doc.roundedRect(bx, y, boxW, boxH, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(String(s.count), bx + boxW / 2, y + 9, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text(s.label, bx + boxW / 2, y + 14, { align: 'center' });
+  });
+
+  y += 24;
+
+  // Items
+  const drawSection = (title, items) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 100, 160);
+    doc.text(title, lm, y);
+    y += 6;
+
+    items.forEach(item => {
+      if (y > 270) { doc.addPage(); y = 18; }
+
+      const colors = {
+        pass: [0, 160, 80],
+        fail: [200, 50, 60],
+        partial: [200, 130, 10],
+        unknown: [120, 130, 140]
+      };
+      const [r, g, b] = colors[item.status] || colors.unknown;
+
+      doc.setFillColor(r, g, b);
+      doc.circle(lm + 2, y - 1.5, 1.5, 'F');
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(30, 30, 30);
+      doc.text(item.name, lm + 6, y);
+
+      const statusLabel = item.status.toUpperCase();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(7);
+      doc.setTextColor(r, g, b);
+      doc.text(`[${statusLabel}]`, rm, y, { align: 'right' });
+
+      y += 5;
+
+      const detail = item.note ? `Note: ${item.note}` : item.detail;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 100, 100);
+      const lines = doc.splitTextToSize(detail, rm - lm - 6);
+      lines.forEach(line => {
+        if (y > 270) { doc.addPage(); y = 18; }
+        doc.text(line, lm + 6, y);
+        y += 4;
+      });
+      y += 2;
+    });
+    y += 4;
+  };
+
+  drawSection('AUTO-DETECTED RESULTS', scanData.auto_results);
+  drawSection('MANUAL VERIFICATION RESULTS', scanData.manual_items);
+
+  // Footer
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`WebSecAudit — Qnayds Academy  |  Page ${i} of ${pageCount}  |  Generated: ${date}`, 105, 290, { align: 'center' });
+  }
+
+  doc.save(`WebSecAudit_${url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.pdf`);
+}
+
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startScan();
+});
+</script>
+</body>
+</html>
